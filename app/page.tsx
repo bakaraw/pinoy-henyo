@@ -110,7 +110,7 @@ export default function Home() {
             Pinoy Henyo
           </h1>
           <p className="mt-1 text-sm text-neutral-500">
-            Yes-or-no guessing, Filipino style
+            Yes-or-no guessing game type shiii
           </p>
         </div>
 
