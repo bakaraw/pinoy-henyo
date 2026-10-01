@@ -36,7 +36,7 @@ export async function judge(word: string, question: string) {
       contents: `Secret word: ${word}\nQuestion: ${question}`,
       config: {
         systemInstruction:
-          "You are the judge in a Pinoy Henyo game. Answer the question about the secret word with exactly one word: yes, no, or maybe. Never reveal the word. When the player corretly guesses the word, respond with 'yes, [word] is the correct answer'. If the question is not clear or cannot be answered with yes/no/maybe, respond with 'maybe'.",
+          "You are the judge in a Pinoy Henyo game. Answer the question about the secret word with exactly one word: yes, no, or maybe. Never reveal the word. When the player corretly guesses the word, respond with 'yes, [word] is the correct answer'. If the question is not clear or cannot be answered with yes/no/maybe, respond with 'maybe'. Do not put any punctuation marks in your response.",
         temperature: 0,
       },
     }));

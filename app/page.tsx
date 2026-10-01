@@ -11,22 +11,26 @@ export default function Home() {
   const [logs, setLogs] = useState<Entry[]>([]);
   const [response, setResponse] = useState<string | null>(null);
   const [previousQuestion, setPreviousQuestion] = useState<string>("");
-
   const [result, setResult] = useState<{ percentile: number | null; total: number } | null>(null);
+  const [askCounter, setAskCounter] = useState<number>(0);
+  const [gaveUp, setGaveUp] = useState<boolean>(false);
 
   async function startGame() {
     setLoading(true);
     const res = await fetch("/api/game/new");
     if (!res.ok) {
       console.error("new game failed:", res.status);
+      setLoading(false);
       return;
     }
-
     const data = await res.json();
     setWord(data.word);
     setQuestion("");
     setLogs([]);
-    console.log("New game started with word:", data.word);
+    setAskCounter(0);
+    setResult(null);
+    setResponse(null);
+    setGaveUp(false);
     setLoading(false);
   }
 
@@ -38,8 +42,10 @@ export default function Home() {
   async function ask() {
     if (!question.trim() || !word) return;
 
+    const nextCount = askCounter + 1;
+    setAskCounter(nextCount);
     if (isCorrectGuess(question, word)) {
-      await finish(); // +1 counts the winning guess
+      await finish(nextCount);
       return;
     }
 
@@ -51,7 +57,6 @@ export default function Home() {
         body: JSON.stringify({ word, question }),
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
-
       const data = await res.json();
       setResponse(data.answer);
       setPreviousQuestion(question);
@@ -64,24 +69,25 @@ export default function Home() {
     }
   }
 
-  async function finish() {
+  async function finish(questionsAsked: number) {
     setLoading(true);
     try {
       const res = await fetch("/api/game/finish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word, questions_asked: logs.length }),
+        body: JSON.stringify({ word, questions_asked: questionsAsked }),
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
       setResult(await res.json());
-      console.log(result);
     } catch (err) {
       console.error("finish failed:", err);
     } finally {
       setLoading(false);
     }
-    alert(`Congratulations! You guessed the word: ${word}`);
+  }
 
+  function giveUp() {
+    setGaveUp(true);
   }
 
   function playAgain() {
@@ -90,75 +96,153 @@ export default function Home() {
     setLogs([]);
     setResponse(null);
     setPreviousQuestion("");
-    setLoading(false);
+    setResult(null);
+    setAskCounter(0);
+    setGaveUp(false);
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center gap-6 px-4 pt-16">
-      {/* Title */}
-      <h1 className="w-full max-w-lg rounded-lg border-2 border-black py-3 text-center text-3xl font-bold">
-        Pinoy Henyo
-      </h1>
+    <main className="flex min-h-screen flex-col items-center bg-neutral-50 px-4 py-16">
+      <div className="w-full max-w-lg space-y-5">
+        {/* Title */}
+        <div className="text-center">
+          <h1 className="text-4xl font-extrabold tracking-tight text-neutral-900">
+            Pinoy Henyo
+          </h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            Yes-or-no guessing, Filipino style
+          </p>
+        </div>
 
-      {/* Description / tutorial */}
-      <section className="w-full max-w-lg rounded-2xl border-2 border-black p-6 text-center">
-        {
-          response === null ? (
-            <p>
-              Guess the secret word by asking yes/no questions. I'll answer yes, no,
-              or maybe. Fewer questions = better score!
-            </p>) : (
-            <p>
-              {previousQuestion} <strong>{response}</strong>
+        {/* Description / last answer */}
+        <section className="rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm">
+          {response === null ? (
+            <p className="text-neutral-600">
+              Guess the secret word by asking yes/no questions. I&apos;ll answer{" "}
+              <span className="font-semibold text-green-600">yes</span>,{" "}
+              <span className="font-semibold text-red-500">no</span>, or{" "}
+              <span className="font-semibold text-amber-500">maybe</span>.
+              Fewer questions = better score!
             </p>
-          )
-        }
-      </section>
-
-      {/* Ask a question + button */}
-      <div className="flex w-full max-w-lg gap-2">
-        {/* <input
-          type="text"
-          placeholder="Ask a question"
-          className="flex-1 rounded-md border-2 border-black px-3 py-2"
-        /> */}
-        {
-          word === null ?
-            !loading ? (
-              <button
-                className="flex-1 rounded-md border-2 border-black px-4 py-2 font-semibold"
-                onClick={startGame}
+          ) : (
+            <div>
+              <p className="text-sm text-neutral-500">&quot;{previousQuestion}&quot;</p>
+              <p
+                className={`mt-1 text-2xl font-bold uppercase ${
+                  response === "yes"
+                    ? "text-green-600"
+                    : response === "no"
+                    ? "text-red-500"
+                    : "text-amber-500"
+                }`}
               >
-                START
+                {response}
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* Question log */}
+        {logs.length > 0 && !result && !gaveUp && (
+          <ul className="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-3 text-sm shadow-sm">
+            {logs.map((e, i) => (
+              <li
+                key={i}
+                className="flex items-center justify-between gap-3 rounded-lg px-2 py-1"
+              >
+                <span className="truncate text-neutral-700">{e.question}</span>
+                <span
+                  className={`shrink-0 text-xs font-bold uppercase ${
+                    e.answer === "yes"
+                      ? "text-green-600"
+                      : e.answer === "no"
+                      ? "text-red-500"
+                      : "text-amber-500"
+                  }`}
+                >
+                  {e.answer}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Result (win or give up) */}
+        {(result || gaveUp) && (
+          <section className="rounded-2xl border-2 border-neutral-900 bg-white p-6 text-center shadow-sm">
+            {result ? (
+              <>
+                <p className="text-lg font-semibold text-neutral-900">
+                  You got it — <span className="capitalize">{word}</span>! 🎉
+                </p>
+                <p className="mt-2 text-sm text-neutral-600">
+                  Asked {askCounter} question{askCounter === 1 ? "" : "s"}
+                </p>
+                <p className="text-sm text-neutral-600">
+                  {result.total <= 1
+                    ? "You're the first to try this word!"
+                    : result.percentile !== null
+                    ? `Better than ${result.percentile}% of players`
+                    : `${result.total} players have tried this word so far`}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-semibold text-neutral-900">
+                  Gave up — the word was <span className="capitalize">{word}</span>
+                </p>
+                <p className="mt-2 text-sm text-neutral-600">
+                  Asked {askCounter} question{askCounter === 1 ? "" : "s"} before giving up
+                </p>
+              </>
+            )}
+            <button
+              onClick={playAgain}
+              className="mt-4 w-full rounded-lg bg-neutral-900 px-4 py-2 font-semibold text-white transition hover:bg-neutral-700"
+            >
+              Play again
+            </button>
+          </section>
+        )}
+
+        {/* Input / start */}
+        {!result && !gaveUp && (
+          <div className="flex w-full gap-2">
+            {word === null ? (
+              <button
+                onClick={startGame}
+                disabled={loading}
+                className="flex-1 rounded-lg bg-neutral-900 px-4 py-3 font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50"
+              >
+                {loading ? "Loading..." : "START"}
               </button>
             ) : (
-              <div className="flex-1 rounded-md border-2 border-black px-4 py-2 font-semibold">
-                Loading...
-              </div>
-            ) : (
-              <div className="flex w-full gap-2">
+              <>
                 <input
                   type="text"
                   placeholder="Ask a question"
-                  className="w-full flex-initial rounded-md border-2 border-black px-3 py-2"
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      ask();
-                    }
-                  }}
+                  onKeyDown={(e) => e.key === "Enter" && ask()}
+                  className="flex-1 rounded-lg border border-neutral-300 bg-white px-4 py-3 outline-none focus:border-neutral-900"
                 />
                 <button
                   disabled={loading || !question.trim()}
-                  className="w-64 flex-initial  rounded-md border-2 border-black px-4 py-2 font-semibold"
                   onClick={ask}
+                  className="rounded-lg bg-neutral-900 px-5 py-3 font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-40"
                 >
                   Ask
                 </button>
-              </div>
-            )
-        }
+                <button
+                  onClick={giveUp}
+                  className="rounded-lg border border-neutral-300 px-4 py-3 font-semibold text-neutral-600 transition hover:bg-neutral-100"
+                >
+                  Give up
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );

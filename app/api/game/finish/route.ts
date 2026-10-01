@@ -23,6 +23,7 @@ export async function POST(req: Request) {
 
     const total = Number(stats.total);
     const percentile = Math.round((Number(stats.worse) / total) * 100);
+    console.log(percentile)
 
     return Response.json({ percentile, total });
 }
